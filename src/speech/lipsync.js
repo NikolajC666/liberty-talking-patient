@@ -1,7 +1,7 @@
 /**
  * Drives mouth morph targets from a viseme track.
  *
- * The scheduler works in two layers:
+ * SCHEDULING works in two layers:
  *
  *   1. On `start`, every word is laid out sequentially using an estimated
  *      milliseconds-per-unit. This alone produces usable lip-sync, and is the
@@ -11,20 +11,47 @@
  *      re-lays out everything after it. Error is therefore bounded by one word
  *      no matter how long the utterance — cumulative drift cannot accumulate.
  *
- * The estimate self-calibrates: every observed word gives us a fresh reading of
- * how long a "unit" actually lasts for the current voice and rate, which is fed
- * back into the layout of the words still to come.
+ * ANIMATION is a critically-damped spring per morph channel, seeking whichever
+ * viseme the schedule says is current. This replaced an earlier scheme that
+ * gave each viseme its own trapezoid envelope, which made the mouth visibly
+ * overact: every phoneme reached its full shape regardless of how long it
+ * actually lasted.
+ *
+ * A spring has mass. A 40 ms consonant between two vowels physically cannot
+ * arrive before it is asked to leave again, so articulatory undershoot emerges
+ * from the model rather than being dialled in — which is what real articulators
+ * do. Combined with the visual-salience weights in `visemes.js`, this is most
+ * of the difference between "chattering" and "speaking".
  */
 
-import { OPENNESS } from './visemes.js';
+import { OPENNESS, SALIENCE } from './visemes.js';
 
 /** Starting guess for one duration unit at rate 1.0, in milliseconds. */
 const BASE_UNIT_MS = 115;
 const MIN_UNIT_MS = 45;
 const MAX_UNIT_MS = 320;
 
-/** How strongly each observation pulls the running estimate. */
+/** How strongly each observed word pulls the running estimate. */
 const CALIBRATION_GAIN = 0.35;
+
+/**
+ * The jaw shuts faster than it drops — and a bilabial that fails to close
+ * because the jaw is still lagging open reads as a mistake. Closing motions get
+ * a stiffer spring than opening ones.
+ */
+const CLOSING_STIFFNESS = 1.7;
+
+/** Below this a channel is treated as at rest and dropped. */
+const EPSILON = 1e-3;
+
+/**
+ * One implicit-Euler step of a critically damped spring. Unconditionally
+ * stable, which matters because frame times spike.
+ */
+function springStep(x, v, target, omega, dt) {
+  const nextV = (v - dt * omega * omega * (x - target)) / (1 + 2 * omega * dt + omega * omega * dt * dt);
+  return [x + dt * nextV, nextV];
+}
 
 export function createLipsync() {
   let track = null;
@@ -33,13 +60,17 @@ export function createLipsync() {
   let lastBoundaryAt = null;
   let boundaryCount = 0;
   let finishedAt = null;
-  let active = [];
+  let lastFrameAt = null;
+  let activeName = null;
+
+  /** name -> { value, velocity } for every channel currently in motion. */
+  const channels = new Map();
 
   const settings = {
-    attackMs: 45,
-    decayMs: 90,
+    /** Spring settle time in ms; lower is snappier, higher undershoots more. */
+    responseMs: 85,
     intensity: 1.0,
-    jawCoupling: 0.45,
+    jawCoupling: 0.25,
     offsetMs: 0,
   };
 
@@ -54,6 +85,25 @@ export function createLipsync() {
     }
   }
 
+  /** Which viseme the schedule says we should be making at time `t`. */
+  function visemeAt(t) {
+    if (!track) return null;
+
+    for (const word of track.words) {
+      if (word.startMs === null || t < word.startMs || t >= word.endMs) continue;
+
+      const span = Math.max(1, word.endMs - word.startMs);
+      let cursor = word.startMs;
+      for (const viseme of word.visemes) {
+        const end = cursor + (viseme.units / word.units) * span;
+        if (t < end) return viseme;
+        cursor = end;
+      }
+      return word.visemes.at(-1) ?? null;
+    }
+    return null;
+  }
+
   return {
     settings,
 
@@ -65,7 +115,6 @@ export function createLipsync() {
       lastBoundaryAt = null;
       boundaryCount = 0;
       finishedAt = null;
-      active = [];
       if (track.words.length) {
         track.words[0].startMs = now;
         layout(0);
@@ -88,10 +137,7 @@ export function createLipsync() {
 
       // The gap since the previous boundary tells us what a unit really costs.
       if (lastBoundaryAt !== null) {
-        const prev = track.words
-          .slice(0, i)
-          .reverse()
-          .find((w) => w.observed);
+        const prev = track.words.slice(0, i).reverse().find((w) => w.observed);
         if (prev && prev.units > 0) {
           const observedUnit = (now - lastBoundaryAt) / prev.units;
           if (observedUnit > MIN_UNIT_MS && observedUnit < MAX_UNIT_MS) {
@@ -107,7 +153,7 @@ export function createLipsync() {
       layout(i);
     },
 
-    /** The synthesiser has stopped. Let the final shapes decay out naturally. */
+    /** The synthesiser has stopped. Springs relax to rest on their own. */
     end(now) {
       if (!track) return;
       const last = track.words.at(-1);
@@ -115,11 +161,11 @@ export function createLipsync() {
       finishedAt = now;
     },
 
-    /** Hard reset — used by Stop, so the mouth closes immediately. */
+    /** Hard reset — used by Stop. Springs still relax rather than snapping. */
     clear() {
       track = null;
-      active = [];
       finishedAt = null;
+      activeName = null;
     },
 
     /**
@@ -128,50 +174,52 @@ export function createLipsync() {
      * @param {Record<string, number>} pose accumulator shared with the idle system
      */
     update(now, pose) {
-      active = [];
-      if (!track) return;
+      const dt = lastFrameAt === null ? 1 / 60 : Math.min(0.1, (now - lastFrameAt) / 1000);
+      lastFrameAt = now;
 
-      const t = now + settings.offsetMs;
-      const { attackMs, decayMs, intensity, jawCoupling } = settings;
-      let jaw = 0;
+      const { responseMs, intensity, jawCoupling } = settings;
+      const viseme = visemeAt(now + settings.offsetMs);
+      activeName = viseme?.name ?? null;
 
-      for (const word of track.words) {
-        if (word.startMs === null) continue;
-        // Skip words wholly outside the envelope window.
-        if (word.endMs + decayMs < t || word.startMs - attackMs > t) continue;
-
-        const span = Math.max(1, word.endMs - word.startMs);
-        let cursor = word.startMs;
-
-        for (const viseme of word.visemes) {
-          const dur = (viseme.units / word.units) * span;
-          const s = cursor;
-          const e = cursor + dur;
-          cursor = e;
-
-          if (t < s - attackMs || t > e + decayMs) continue;
-
-          // Trapezoid envelope: ramp in before the slot, hold, ramp out after.
-          const rampIn = attackMs > 0 ? (t - (s - attackMs)) / attackMs : t >= s ? 1 : 0;
-          const rampOut = decayMs > 0 ? (e + decayMs - t) / decayMs : t <= e ? 1 : 0;
-          const env = Math.max(0, Math.min(1, rampIn, rampOut));
-          if (env <= 0) continue;
-
-          const value = env * viseme.weight * intensity;
-          // Overlapping shapes take the strongest rather than summing, which
-          // would push blendshapes past 1 and distort the face.
-          pose[viseme.name] = Math.max(pose[viseme.name] ?? 0, value);
-          jaw = Math.max(jaw, (OPENNESS[viseme.name] ?? 0) * value * jawCoupling);
-
-          if (env > 0.5) active.push(viseme.name);
-        }
+      // Targets: the current viseme at its visual-salience weight, and a jaw
+      // opening to match. Everything else seeks zero.
+      const targets = new Map();
+      if (viseme && viseme.name !== 'viseme_sil') {
+        const weight = (SALIENCE[viseme.name] ?? 0.6) * viseme.weight * intensity;
+        targets.set(viseme.name, weight);
+        const jaw = (OPENNESS[viseme.name] ?? 0) * weight * jawCoupling;
+        if (jaw > 0) targets.set('jawOpen', jaw);
       }
 
-      if (jaw > 0) pose.jawOpen = Math.max(pose.jawOpen ?? 0, jaw);
+      // Springs need to keep running for channels that are on their way back to
+      // rest, so integrate the union of live channels and current targets.
+      for (const name of targets.keys()) {
+        if (!channels.has(name)) channels.set(name, { value: 0, velocity: 0 });
+      }
 
-      // Once everything has decayed away, drop the track so we stop iterating.
-      if (finishedAt !== null && now > finishedAt + decayMs + 120) {
+      const omegaBase = (2 * Math.PI) / Math.max(0.016, responseMs / 1000);
+
+      for (const [name, channel] of channels) {
+        const target = targets.get(name) ?? 0;
+        const omega = target < channel.value ? omegaBase * CLOSING_STIFFNESS : omegaBase;
+        const [value, velocity] = springStep(channel.value, channel.velocity, target, omega, dt);
+        channel.value = value;
+        channel.velocity = velocity;
+
+        if (target === 0 && Math.abs(value) < EPSILON && Math.abs(velocity) < EPSILON) {
+          channels.delete(name);
+          continue;
+        }
+
+        // Clamp: a spring can overshoot past 1, which distorts a blendshape.
+        const clamped = Math.max(0, Math.min(1, value));
+        if (clamped > 0) pose[name] = Math.max(pose[name] ?? 0, clamped);
+      }
+
+      // Once the utterance is over and the face has settled, drop the track.
+      if (finishedAt !== null && now > finishedAt && channels.size === 0) {
         track = null;
+        finishedAt = null;
       }
     },
 
@@ -182,7 +230,8 @@ export function createLipsync() {
         unitMs,
         rate,
         boundaryCount,
-        active: active[active.length - 1] ?? null,
+        active: activeName,
+        channels: channels.size,
         source: boundaryCount > 0 ? 'boundary-corrected' : track ? 'estimated' : '—',
       };
     },

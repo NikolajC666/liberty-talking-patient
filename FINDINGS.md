@@ -84,7 +84,40 @@ is right often enough for a prototype and would not survive scrutiny in a
 shipped product. A production build should use a phonemiser, and if it is
 already paying for cloud TTS it should take the phoneme timings from there.
 
-### 5. Idle motion matters more than lip-sync quality.
+### 5. Over-articulation was the first problem, not inaccuracy. **(Observed)**
+
+First look at the running app: the mouth was *excessive* and the shapes were
+wrong. Two separate faults, and the excessive one turned out to dominate — a
+face that overacts reads as wrong even where the shape is right.
+
+Three causes, all in the animation layer rather than the phonetics:
+
+1. **Every viseme reached full amplitude**, regardless of how long its slot
+   was. A 40 ms consonant was drawn as emphatically as a 200 ms vowel.
+2. **Independent trapezoid envelopes per viseme.** With attack and decay
+   overlapping, several shapes were held at once — the mouth attempting three
+   phonemes simultaneously.
+3. **Every consonant weighted like a vowel**, with `jawOpen` stacked on top.
+
+The fix was to make the articulators behave like objects with mass. Each morph
+channel is now a critically-damped spring seeking whichever single viseme the
+schedule says is current; everything else seeks zero. A shape the mouth has no
+time to reach simply is not reached, so undershoot falls out of the model rather
+than being tuned in. Closing motions get a stiffer spring than opening ones,
+because a bilabial that fails to shut is the most visible error there is.
+
+Alongside it, visemes are now weighted by **visual salience** — how much of the
+articulation is externally visible. Velars (`k`, `g`) are made at the back of
+the tongue and show almost nothing; alveolars (`t`, `d`, `n`, `l`) little more.
+What a viewer reads is vowels, bilabials and labiodentals. This is why viseme
+sets are equivalence classes in the first place, and driving the invisible
+consonants at full weight is what produced the chatter.
+
+The general lesson, which would apply to any avatar work: **most of what reads
+as "bad lip-sync" is an animation problem, not a phonetics problem.** Worth
+exhausting the animation model before spending money on better phonemes.
+
+### 6. Idle motion matters more than lip-sync quality.
 
 Not measurable, but worth stating because it drives where effort goes. A head
 that moves only when speaking reads as a mannequin between lines, and no amount
@@ -92,7 +125,7 @@ of mouth accuracy rescues that. Blinking, breathing and sub-degree head drift
 are perhaps sixty lines of code (`src/idle.js`) and do more for believability
 than the entire viseme pipeline.
 
-### 6. Cost and footprint.
+### 7. Cost and footprint.
 
 - Bundle: **624 kB, 161 kB gzipped**, almost all three.js.
 - Dependencies: two (`three`, `vite`).
@@ -100,7 +133,7 @@ than the entire viseme pipeline.
 - Runtime network calls: **none**, once the avatar is on disk — with the
   exception in §8.
 
-### 7. Ready Player Me is DNS-blocked on the Laerdal network.
+### 8. Ready Player Me is DNS-blocked on the Laerdal network.
 
 `models.readyplayer.me` and `readyplayer.me` do not resolve from a company
 machine. npm, GitHub and everything else tested resolve normally, so this is
@@ -128,7 +161,7 @@ licence covers the code; the assets came from four different avatar vendors and
 their terms have not been checked. Fine for an internal spike. **Do not ship on
 them.**
 
-### 8. "No cloud" is a property of the voice, not of the app.
+### 9. "No cloud" is a property of the voice, not of the app.
 
 Chrome's `Google …` voices synthesise **server-side**. They need no API key, so
 they feel local, but the text leaves the machine. For anything involving
@@ -198,7 +231,7 @@ viseme events with timings, removing both the phonemiser problem (§4) and the
 prediction machinery (§3) at the cost of a key and a proxy. `src/speech/tts.js`
 is the only file that would change.
 
-On the avatar: none of the presets in §7 will pass for the patient in
+On the avatar: none of the presets in §8 will pass for the patient in
 `example.webp`. They are healthy adults in street clothes; the reference is a
 photoreal elderly patient, supine, in a gown, on oxygen. Closing that gap is a
 character-art problem, not a code problem — the pipeline here is indifferent to

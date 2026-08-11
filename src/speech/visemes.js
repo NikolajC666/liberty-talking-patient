@@ -54,6 +54,37 @@ export const OPENNESS = {
 };
 
 /**
+ * How much of the shape is visible from outside the face, 0..1.
+ *
+ * This is the fix for an over-animated mouth, and it is a phonetic fact rather
+ * than a fudge. Velars (k, g) are articulated at the back of the tongue and are
+ * externally almost invisible; alveolars (t, d, n, l, s) are nearly as hidden.
+ * What a viewer actually reads is the vowels, the bilabials (p, b, m) and the
+ * labiodentals (f, v) — which is why visemes are equivalence classes in the
+ * first place.
+ *
+ * Driving every consonant at full amplitude makes a face chatter in a way real
+ * speech never does.
+ */
+export const SALIENCE = {
+  viseme_sil: 0.0,
+  viseme_PP: 1.0, // lips must actually meet — an unclosed "m" is glaring
+  viseme_FF: 0.8, // teeth on lip, clearly visible
+  viseme_TH: 0.65, // tongue tip shows
+  viseme_DD: 0.42,
+  viseme_kk: 0.3, // back of tongue; essentially invisible
+  viseme_CH: 0.7, // rounded and protruded
+  viseme_SS: 0.45,
+  viseme_nn: 0.4,
+  viseme_RR: 0.6,
+  viseme_aa: 1.0,
+  viseme_E: 0.9,
+  viseme_I: 0.75,
+  viseme_O: 1.0,
+  viseme_U: 0.95,
+};
+
+/**
  * Relative duration of each shape. Vowels are the metrical backbone; plosives
  * are over almost as soon as they start.
  */

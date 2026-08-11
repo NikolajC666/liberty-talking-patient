@@ -8,6 +8,7 @@
  */
 
 import { getResponse } from './respond.js';
+import { SALIENCE } from './speech/visemes.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -128,8 +129,7 @@ export function createUI({ speech, lipsync, idle, avatar }) {
 
   slider('rate', (v) => { voiceOptions.rate = v; });
   slider('pitch', (v) => { voiceOptions.pitch = v; });
-  slider('attack', (v) => { lipsync.settings.attackMs = v; }, ms);
-  slider('decay', (v) => { lipsync.settings.decayMs = v; }, ms);
+  slider('response', (v) => { lipsync.settings.responseMs = v; }, ms);
   slider('intensity', (v) => { lipsync.settings.intensity = v; });
   slider('jaw', (v) => { lipsync.settings.jawCoupling = v; });
   slider('offset', (v) => { lipsync.settings.offsetMs = v; }, ms);
@@ -193,14 +193,17 @@ export function createUI({ speech, lipsync, idle, avatar }) {
         const right = x(cursor + dur);
         cursor += dur;
 
+        // Bar height is the viseme's visual salience, so the strip shows what
+        // is actually driving the face rather than just the schedule.
         const silent = viseme.name === 'viseme_sil';
+        const height = Math.max(2, 34 * (SALIENCE[viseme.name] ?? 0.6));
         ctx.fillStyle = silent ? '#1d242e' : '#2f6fb5';
-        ctx.fillRect(left, 22, Math.max(1, right - left - 1), 34);
+        ctx.fillRect(left, 56 - height, Math.max(1, right - left - 1), height);
 
         if (right - left > 26) {
           ctx.fillStyle = silent ? '#586069' : '#dbeafe';
           ctx.font = '10px system-ui';
-          ctx.fillText(viseme.name.replace('viseme_', ''), left + 4, 42);
+          ctx.fillText(viseme.name.replace('viseme_', ''), left + 4, 52);
         }
       }
 

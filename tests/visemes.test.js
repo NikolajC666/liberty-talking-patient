@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildTrack, wordToVisemes, VISEMES, OPENNESS } from '../src/speech/visemes.js';
+import { buildTrack, wordToVisemes, VISEMES, OPENNESS, SALIENCE } from '../src/speech/visemes.js';
 
 const shapes = (word) => wordToVisemes(word).map((v) => v.name.replace('viseme_', ''));
 
@@ -46,6 +46,7 @@ test('every emitted viseme is one the avatar actually has', () => {
     for (const viseme of word.visemes) {
       assert.ok(VISEMES.includes(viseme.name), `unknown viseme ${viseme.name}`);
       assert.ok(viseme.name in OPENNESS, `no openness for ${viseme.name}`);
+      assert.ok(viseme.name in SALIENCE, `no salience for ${viseme.name}`);
       assert.ok(viseme.units > 0);
     }
   }
