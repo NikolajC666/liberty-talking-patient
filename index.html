@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Talking patient — lip-sync spike</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <main id="stage">
+        <canvas id="view"></canvas>
+
+        <div id="boot" class="overlay">
+          <div class="spinner"></div>
+          <p id="boot-text">Loading avatar…</p>
+        </div>
+
+        <p id="caption" class="caption" aria-live="polite"></p>
+
+        <button id="debug-toggle" class="ghost-btn" title="Toggle debug panel (D)">
+          Debug
+        </button>
+      </main>
+
+      <form id="composer" autocomplete="off">
+        <input
+          id="input"
+          type="text"
+          placeholder="Type what the patient should say…"
+          aria-label="Text for the patient to speak"
+        />
+        <button id="speak" type="submit">Speak</button>
+        <button id="stop" type="button" class="secondary" disabled>Stop</button>
+      </form>
+
+      <aside id="debug" hidden>
+        <header>
+          <h2>Instrumentation</h2>
+          <button id="debug-close" class="ghost-btn" aria-label="Close">✕</button>
+        </header>
+
+        <section>
+          <h3>Voice</h3>
+          <select id="voice" aria-label="Voice"></select>
+          <p id="voice-note" class="note"></p>
+          <label class="slider">
+            <span>Rate <output id="rate-out">1.00</output></span>
+            <input id="rate" type="range" min="0.5" max="1.5" step="0.05" value="1" />
+          </label>
+          <label class="slider">
+            <span>Pitch <output id="pitch-out">1.00</output></span>
+            <input id="pitch" type="range" min="0.5" max="1.5" step="0.05" value="1" />
+          </label>
+        </section>
+
+        <section>
+          <h3>Lip-sync</h3>
+          <label class="slider">
+            <span>Attack <output id="attack-out">45</output> ms</span>
+            <input id="attack" type="range" min="0" max="200" step="5" value="45" />
+          </label>
+          <label class="slider">
+            <span>Decay <output id="decay-out">90</output> ms</span>
+            <input id="decay" type="range" min="0" max="300" step="5" value="90" />
+          </label>
+          <label class="slider">
+            <span>Intensity <output id="intensity-out">1.00</output></span>
+            <input id="intensity" type="range" min="0" max="1.5" step="0.05" value="1" />
+          </label>
+          <label class="slider">
+            <span>Jaw coupling <output id="jaw-out">0.45</output></span>
+            <input id="jaw" type="range" min="0" max="1" step="0.05" value="0.45" />
+          </label>
+          <label class="slider">
+            <span>Lead / lag <output id="offset-out">0</output> ms</span>
+            <input id="offset" type="range" min="-300" max="300" step="10" value="0" />
+          </label>
+        </section>
+
+        <section>
+          <h3>Timeline</h3>
+          <canvas id="timeline" width="620" height="94"></canvas>
+          <p class="note legend">
+            <span class="swatch scheduled"></span> viseme window
+            <span class="swatch boundary"></span> boundary event
+            <span class="swatch playhead"></span> playhead
+          </p>
+        </section>
+
+        <section>
+          <h3>Readout</h3>
+          <dl id="readout">
+            <dt>Boundary events</dt><dd id="r-boundaries">—</dd>
+            <dt>Timing source</dt><dd id="r-source">—</dd>
+            <dt>Calibrated unit</dt><dd id="r-unit">—</dd>
+            <dt>Active viseme</dt><dd id="r-viseme">—</dd>
+            <dt>Morph targets</dt><dd id="r-morphs">—</dd>
+            <dt>FPS</dt><dd id="r-fps">—</dd>
+          </dl>
+          <label class="check">
+            <input id="freeze-idle" type="checkbox" />
+            <span>Freeze idle life (isolate lip-sync)</span>
+          </label>
+        </section>
+      </aside>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

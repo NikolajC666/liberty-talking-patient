@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+
+# Local Claude Code settings — machine-specific.
+.claude/
+
+# Fetched with `npm run fetch-avatar`, not source. Ready Player Me avatars are
+# a few MB each and are trivially re-downloadable.
+public/avatars/*.glb
+
+.env
+.env.local
+.DS_Store
+Thumbs.db
