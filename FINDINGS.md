@@ -161,16 +161,55 @@ licence covers the code; the assets came from four different avatar vendors and
 their terms have not been checked. Fine for an internal spike. **Do not ship on
 them.**
 
-### 9. "No cloud" is a property of the voice, not of the app.
+### 9. Voice privacy and voice quality are inversely correlated, and the API only reports one of them. **(Observed)**
 
-Chrome's `Google …` voices synthesise **server-side**. They need no API key, so
-they feel local, but the text leaves the machine. For anything involving
-realistic patient dialogue that distinction is a procurement question, not a
-technical detail.
+`voice.localService` tells you *where* synthesis happens. Nothing in the Web
+Speech API tells you how good a voice sounds — and on Windows the two run
+opposite to each other.
 
-Edge and Windows SAPI voices run on-device. The voice picker reports
-`voice.localService` for each, and the panel says plainly which you have
-selected.
+The only on-device voices installed on a standard Laerdal machine are:
+
+```
+Microsoft David Desktop   en-US   Male
+Microsoft Zira Desktop    en-US   Female
+```
+
+Both are 2013-era concatenative SAPI voices. Meanwhile Microsoft's genuinely
+natural neural voices — `Microsoft … Online (Natural)` — are exposed free and
+without an API key **through Edge's Web Speech implementation**, and are
+server-side. Chrome does not expose them at all; it offers Google's network
+voices, which land in between.
+
+So "keep it on-device" and "make it sound human" are, on this platform, direct
+opposites. That is a procurement question rather than a technical one, and it
+needs deciding before anyone demos patient dialogue.
+
+The picker originally defaulted to an on-device English voice, which reliably
+selected the worst-sounding option on the machine while appearing to be a
+neutral default. It now ranks by inferred quality (`voiceQuality()` in
+`tts.js`) and states plainly, per voice, whether audio leaves the device — the
+tradeoff is surfaced rather than made silently.
+
+### 10. If better audio is needed, the ladder is short.
+
+| Option | Keys | Local | Phoneme timings | Notes |
+| --- | --- | --- | --- | --- |
+| Edge neural voices | no | no | **unverified** | Free, already wired up |
+| Kokoro-82M in-browser | no | yes | no (audio only) | ~90 MB model, WebGPU |
+| Azure Speech | yes | no | **yes** | Also SSML speaking styles |
+| ElevenLabs | yes | no | no (audio only) | Most realistic and emotive |
+
+Everything below the first row returns an **audio buffer**, which breaks the
+constraint in §1: once the audio is in the page, Web Audio can analyse it and
+lip-sync stops being a prediction problem.
+
+**Open question, deliberately unresolved:** whether nursing simulation needs
+*expressive* delivery — breathless, weak, in pain — rather than merely natural
+delivery. A flawlessly smooth neural voice saying "I can't catch my breath" may
+be less useful than a rougher one that sounds distressed. Web Speech exposes
+rate and pitch and nothing else; Azure has speaking styles and ElevenLabs has
+emotional control. Judged not to matter for the spike; likely to matter for a
+product.
 
 ---
 
@@ -200,6 +239,13 @@ Step through the voice list. The **Timing source** readout says
 `boundary-corrected` or `estimated`. Note which voices fall back — and whether
 the fallback is obviously worse to watch, or only obviously worse on the
 timeline.
+
+**The one that matters most:** do Edge's `Online (Natural)` neural voices emit
+boundary events? If they do, this platform gives good audio *and* accurate sync
+for free, and the case for paying for Azure weakens considerably. If they do
+not, then §9's privacy-versus-quality tradeoff gains a third axis — better audio
+costs sync accuracy too — and the argument for a TTS that returns real viseme
+timings gets much stronger.
 
 ### D. Calibrated unit.
 
