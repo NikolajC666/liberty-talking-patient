@@ -1,8 +1,14 @@
 # Talking patient — browser lip-sync spike
 
+**Live demo: https://nikolajc666.github.io/liberty-talking-patient/**
+
 A browser talking head for nursing simulation: type a line, the patient says it,
 the mouth follows. Built with three.js and the Web Speech API, no API keys, no
 game engine, no per-seat licence.
+
+Use Chrome or Edge — the demo depends on `speechSynthesis`, and voice quality
+and boundary-event support both vary by browser. Press **D** for the
+instrumentation panel.
 
 This is a **feasibility spike**. The point is not the demo — it is the answer to
 "how good does browser lip-sync get, and where does it break?". That answer
@@ -52,7 +58,17 @@ Press **D** or the Debug button for the instrumentation panel.
 ```sh
 npm test          # viseme rules
 npm run build     # production bundle
+npm run deploy    # build and publish to GitHub Pages
 ```
+
+`npm run deploy` pushes `dist/` to the `gh-pages` branch. Fetch an avatar first,
+or the deployed site ships the placeholder head.
+
+There is also `.github/workflows/deploy.yml`, which does the same thing on every
+push to `main` and fetches the avatar itself. It is currently untracked, because
+GitHub rejects pushes that touch workflow files unless the token carries the
+`workflow` scope. To switch over: `gh auth refresh -s workflow`, then delete the
+`.github/workflows/` line from `.gitignore` and commit.
 
 ## How it works
 
