@@ -8,9 +8,9 @@
  * stomped by a viseme, or `jawOpen` from being fought over.
  */
 
-import * as THREE from 'three';
 import { createScene } from './scene.js';
 import { loadAvatar, createPlaceholderAvatar } from './avatar.js';
+import { createHeadPivot, createRotationControls } from './controls.js';
 import { createIdle } from './idle.js';
 import { createLipsync } from './speech/lipsync.js';
 import { createSpeech, isSupported } from './speech/index.js';
@@ -57,8 +57,13 @@ async function boot() {
       'Run `npm run fetch-avatar <readyplayer.me url>` for the real one.';
   }
 
-  stage.scene.add(avatar.root);
-  stage.frameOn(avatar.headAnchor(new THREE.Vector3()));
+  // Rotate about the head rather than the model's origin, which is on the
+  // floor between its feet — otherwise turning swings the face out of frame.
+  const { pivot, anchor } = createHeadPivot(avatar);
+  stage.scene.add(pivot);
+  stage.frameOn(anchor);
+
+  const controls = createRotationControls(stage.renderer.domElement, pivot, { limitDeg: 20 });
 
   // Everything the model actually offers, so the viseme map can be checked
   // against reality rather than assumption.
@@ -117,6 +122,7 @@ async function boot() {
     idle.update(dt, pose);
     lipsync.update(now, pose);
     avatar.applyPose(pose);
+    controls.update(dt);
 
     stage.render();
     ui.update(now, fps);

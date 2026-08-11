@@ -7,8 +7,10 @@ the mouth follows. Built with three.js and the Web Speech API, no API keys, no
 game engine, no per-seat licence.
 
 Use Chrome or Edge — the demo depends on `speechSynthesis`, and voice quality
-and boundary-event support both vary by browser. Press **D** for the
-instrumentation panel.
+and boundary-event support both vary by browser.
+
+Drag to turn the patient (±20° each way), double-click to centre, and press
+**D** for the instrumentation panel.
 
 This is a **feasibility spike**. The point is not the demo — it is the answer to
 "how good does browser lip-sync get, and where does it break?". That answer
@@ -110,6 +112,7 @@ paragraph cannot drift out of sync the way a fire-and-forget schedule would.
 | `src/main.js` | boot, render loop, pose composition |
 | `src/scene.js` | renderer, portrait-lens camera, three-point lighting |
 | `src/avatar.js` | glTF loading and the procedural fallback head |
+| `src/controls.js` | clamped drag-to-turn, pivoted at the head |
 | `src/idle.js` | blinking, breathing, head drift, saccades |
 | `src/speech/visemes.js` | text → viseme track (pure, unit-tested) |
 | `src/speech/lipsync.js` | scheduling, boundary correction, blending |

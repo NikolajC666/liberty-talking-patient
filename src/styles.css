@@ -39,6 +39,23 @@ html, body {
   display: block;
   width: 100%;
   height: 100%;
+  cursor: grab;
+  /* Stop touch-drags scrolling the page instead of turning the patient. */
+  touch-action: none;
+}
+
+#view.grabbing { cursor: grabbing; }
+
+.hint {
+  position: absolute;
+  left: 14px;
+  bottom: 16px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
 }
 
 .overlay {
