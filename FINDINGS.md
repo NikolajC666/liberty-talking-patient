@@ -190,6 +190,12 @@ neutral default. It now ranks by inferred quality (`voiceQuality()` in
 `tts.js`) and states plainly, per voice, whether audio leaves the device — the
 tradeoff is surfaced rather than made silently.
 
+Gender is not reported either. `SpeechSynthesisVoice` carries only `name`,
+`lang`, `localService` and `default`, so selecting a male voice for a male
+patient means matching against a list of known voice names — brittle by
+construction, and worth knowing about if voice selection ever needs to be
+driven by scenario metadata.
+
 ### 10. If better audio is needed, the ladder is short.
 
 | Option | Keys | Local | Phoneme timings | Notes |

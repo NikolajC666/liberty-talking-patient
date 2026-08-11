@@ -151,8 +151,41 @@ export function voiceQuality(voice) {
 }
 
 /**
+ * Male voice names across the platforms this is likely to run on.
+ *
+ * `SpeechSynthesisVoice` exposes only `name`, `lang`, `localService` and
+ * `default` — there is no gender attribute — so this has to be a name list.
+ * It is inherently incomplete; anything unrecognised simply falls through and
+ * keeps its place in the ordering.
+ */
+const MALE_VOICE_NAMES = new Set([
+  // Windows SAPI
+  'david',
+  // Edge neural, en-US
+  'andrew', 'brian', 'christopher', 'eric', 'guy', 'roger', 'steffan',
+  // Edge neural, other English locales
+  'connor', 'james', 'liam', 'luke', 'mitchell', 'prabhat', 'ryan', 'sam',
+  'thomas', 'wayne', 'william',
+  // macOS / iOS
+  'aaron', 'alex', 'daniel', 'fred', 'oliver', 'rishi', 'tom',
+]);
+
+/**
+ * Whether a voice is male, as far as can be told from its name.
+ *
+ * The patient in the reference material is an elderly man, so a male voice is
+ * the right default for this app rather than a user preference.
+ */
+export function isMaleVoice(voice) {
+  const name = voice.name?.toLowerCase() ?? '';
+  if (name.includes('female')) return false;
+  if (/\bmale\b/.test(name)) return true; // "Google UK English Male"
+  return [...MALE_VOICE_NAMES].some((first) => new RegExp(`\\b${first}\\b`).test(name));
+}
+
+/**
  * Rank voices so the ones worth demoing float to the top: English first, then
- * best-sounding, then alphabetical.
+ * best-sounding, then male, then alphabetical.
  *
  * This deliberately ranks quality above privacy. An earlier version preferred
  * on-device voices, which meant the default was always the most robotic option
@@ -166,6 +199,11 @@ export function sortVoices(voices) {
 
     const quality = voiceQuality(b) - voiceQuality(a);
     if (quality !== 0) return quality;
+
+    // Within a quality tier, prefer male. Without this the default fell to
+    // whichever name sorted first alphabetically — usually Ana or Aria.
+    const male = Number(isMaleVoice(b)) - Number(isMaleVoice(a));
+    if (male !== 0) return male;
 
     return a.name.localeCompare(b.name);
   });
