@@ -9,6 +9,7 @@
 
 import { getResponse } from './respond.js';
 import { SALIENCE } from './speech/visemes.js';
+import { voiceQuality } from './speech/tts.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -84,12 +85,9 @@ export function createUI({ speech, lipsync, idle, avatar }) {
       els.voice.append(option);
     });
 
-    // Prefer an on-device English voice: no network, and the boundary events
-    // are more reliable than the cloud voices'.
-    const preferred = speech.voices.findIndex(
-      (v) => v.localService && v.lang?.toLowerCase().startsWith('en'),
-    );
-    els.voice.value = String(preferred >= 0 ? preferred : 0);
+    // The list is already sorted best-first, so index 0 is the most natural
+    // English voice this browser offers.
+    els.voice.value = '0';
     describeVoice();
   }
 
@@ -100,11 +98,24 @@ export function createUI({ speech, lipsync, idle, avatar }) {
       els.voiceNote.className = 'note warn';
       return;
     }
-    if (voice.localService) {
-      els.voiceNote.textContent = `${voice.lang} · on-device, nothing leaves the machine.`;
+
+    const tier = voiceQuality(voice);
+    const where = voice.localService
+      ? 'on-device, nothing leaves the machine'
+      : 'synthesised server-side, despite needing no API key';
+
+    if (tier >= 4) {
+      els.voiceNote.textContent = `${voice.lang} · neural voice — ${where}.`;
       els.voiceNote.className = 'note';
+    } else if (tier <= 1) {
+      // Nudge toward Edge, which is the only free route to a neural voice here.
+      const hasNeural = speech.voices.some((v) => voiceQuality(v) >= 4);
+      els.voiceNote.textContent = hasNeural
+        ? `${voice.lang} · dated SAPI voice — ${where}. Pick a "Natural" voice above for far better audio.`
+        : `${voice.lang} · dated SAPI voice — ${where}. Microsoft Edge exposes free neural voices; this browser does not.`;
+      els.voiceNote.className = 'note warn';
     } else {
-      els.voiceNote.textContent = `${voice.lang} · synthesised server-side despite needing no API key.`;
+      els.voiceNote.textContent = `${voice.lang} · ${where}.`;
       els.voiceNote.className = 'note warn';
     }
   }

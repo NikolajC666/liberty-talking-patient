@@ -129,14 +129,44 @@ export function createTTS() {
 }
 
 /**
- * Rank voices so the ones worth demoing float to the top: English first,
- * on-device before cloud-backed, then alphabetical.
+ * Rough quality tier for a voice, inferred from its name.
+ *
+ * There is no API for this — `localService` tells you where synthesis happens,
+ * not how good it sounds, and the two are inversely correlated. The only
+ * on-device Windows voices are the 2013-era SAPI ones ("Microsoft David
+ * Desktop"), while the genuinely natural ones are neural and server-side.
+ *
+ * Edge exposes Microsoft's "Online (Natural)" neural voices through the Web
+ * Speech API for free and without a key. They are far and away the best thing
+ * available on this platform. Chrome does not expose them; it offers Google's
+ * network voices, which sit somewhere in between.
+ */
+export function voiceQuality(voice) {
+  const name = voice.name?.toLowerCase() ?? '';
+  if (name.includes('natural')) return 4; // Edge neural
+  if (name.includes('online')) return 3;
+  if (name.includes('google')) return 2;
+  if (voice.localService) return 1; // old SAPI concatenative voices
+  return 1.5;
+}
+
+/**
+ * Rank voices so the ones worth demoing float to the top: English first, then
+ * best-sounding, then alphabetical.
+ *
+ * This deliberately ranks quality above privacy. An earlier version preferred
+ * on-device voices, which meant the default was always the most robotic option
+ * on the machine. The picker labels which voices leave the device, so the
+ * tradeoff stays visible rather than being made silently.
  */
 export function sortVoices(voices) {
   return [...voices].sort((a, b) => {
     const english = (v) => (v.lang?.toLowerCase().startsWith('en') ? 0 : 1);
     if (english(a) !== english(b)) return english(a) - english(b);
-    if (a.localService !== b.localService) return a.localService ? -1 : 1;
+
+    const quality = voiceQuality(b) - voiceQuality(a);
+    if (quality !== 0) return quality;
+
     return a.name.localeCompare(b.name);
   });
 }
