@@ -14,10 +14,14 @@ import { createHeadPivot, createRotationControls } from './controls.js';
 import { createIdle } from './idle.js';
 import { createLipsync } from './speech/lipsync.js';
 import { createSpeech, isSupported } from './speech/index.js';
+import { createVisemeAdapter } from './speech/arkitVisemes.js';
 import { createUI } from './ui.js';
 
 // Resolved against the deploy base so it works under a Pages subpath too.
-const AVATAR_URL = `${import.meta.env.BASE_URL}avatars/patient.glb`;
+// First match wins, so a hand-supplied model takes precedence over a preset.
+const AVATAR_URLS = ['avatars/patient.fbx', 'avatars/patient.glb'].map(
+  (path) => `${import.meta.env.BASE_URL}${path}`,
+);
 const EXAMPLE_LINE = "Nurse, I can't catch my breath.";
 
 const stage = createScene(document.getElementById('view'));
@@ -37,17 +41,19 @@ async function boot() {
   const bootText = document.getElementById('boot-text');
 
   let avatar;
-  let usingPlaceholder = false;
+  let usingPlaceholder = true;
 
-  if (await avatarExists(AVATAR_URL)) {
+  for (const url of AVATAR_URLS) {
+    if (!(await avatarExists(url))) continue;
     try {
-      avatar = await loadAvatar(AVATAR_URL);
+      bootText.textContent = 'Loading avatar…';
+      avatar = await loadAvatar(url);
+      usingPlaceholder = false;
+      console.info(`[avatar] loaded ${url}`);
+      break;
     } catch (error) {
-      console.error('Avatar failed to load:', error);
-      usingPlaceholder = true;
+      console.error(`Avatar failed to load from ${url}:`, error);
     }
-  } else {
-    usingPlaceholder = true;
   }
 
   if (usingPlaceholder) {
@@ -67,21 +73,17 @@ async function boot() {
 
   // Everything the model actually offers, so the viseme map can be checked
   // against reality rather than assumption.
+  console.info(`[avatar] ${avatar.morphNames.length} morph targets`, avatar.morphNames);
+
+  // Models without native visemes get them synthesised from ARKit shapes.
+  const visemes = createVisemeAdapter(avatar);
   console.info(
-    `[avatar] ${usingPlaceholder ? 'placeholder' : AVATAR_URL} — ` +
-      `${avatar.morphNames.length} morph targets`,
-    avatar.morphNames,
+    `[avatar] visemes: ${visemes.native ? 'native Oculus shapes' : 'synthesised from ARKit'}`,
   );
 
-  const missing = ['viseme_aa', 'viseme_PP', 'jawOpen', 'eyeBlinkLeft'].filter(
-    (name) => !avatar.has(name),
-  );
+  const missing = ['jawOpen', 'eyeBlinkLeft'].filter((name) => !avatar.has(name));
   if (missing.length && !usingPlaceholder) {
-    console.warn(
-      '[avatar] expected blendshapes are absent:',
-      missing,
-      '— re-fetch with ?morphTargets=ARKit,Oculus Visemes',
-    );
+    console.warn('[avatar] expected blendshapes are absent:', missing);
   }
 
   const lipsync = createLipsync();
@@ -121,7 +123,7 @@ async function boot() {
     const pose = {};
     idle.update(dt, pose);
     lipsync.update(now, pose);
-    avatar.applyPose(pose);
+    avatar.applyPose(visemes.translate(pose));
     controls.update(dt);
 
     stage.render();

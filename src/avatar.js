@@ -19,6 +19,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 
 /** Ready Player Me rigs are mixamo-named; fall back through likely spellings. */
 const BONE_ALIASES = {
@@ -29,9 +30,60 @@ const BONE_ALIASES = {
   eyeR: ['RightEye', 'mixamorigRightEye'],
 };
 
+/**
+ * Blendshape names arrive differently depending on the exporter: bare
+ * (`jawOpen`), mesh-qualified (`AvatarHead.jawOpen`) or pipe-separated
+ * (`Head|jawOpen`). Index on the bare name so lookups work regardless.
+ */
+function bareName(name) {
+  return name.split('|').pop().split('.').pop();
+}
+
+/**
+ * FBX has no unit convention worth relying on — most exporters write
+ * centimetres. The camera works in metres, so a 170-unit model would fill the
+ * frame with a nostril. Rescale anything implausibly large.
+ */
+function normaliseScale(root) {
+  const height = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3()).y;
+  if (height > 5) {
+    root.scale.multiplyScalar(0.01);
+    root.updateMatrixWorld(true);
+    console.info(`[avatar] model was ${height.toFixed(0)} units tall; assuming cm and scaling to metres`);
+  }
+  return root;
+}
+
+/**
+ * FBXLoader produces Phong materials, which ignore the PBR maps these models
+ * ship and look plasticky under image-based lighting. Promote them to Standard
+ * and carry across what does transfer.
+ */
+function upgradeMaterials(node) {
+  const materials = Array.isArray(node.material) ? node.material : [node.material];
+  const upgraded = materials.map((mat) => {
+    if (!mat || mat.isMeshStandardMaterial) return mat;
+    const std = new THREE.MeshStandardMaterial({
+      name: mat.name,
+      color: mat.color ?? 0xffffff,
+      map: mat.map ?? null,
+      normalMap: mat.normalMap ?? null,
+      transparent: mat.transparent,
+      alphaTest: mat.alphaTest,
+      side: mat.side,
+      roughness: 0.72,
+      metalness: 0.0,
+    });
+    mat.dispose();
+    return std;
+  });
+  node.material = Array.isArray(node.material) ? upgraded : upgraded[0];
+}
+
 export async function loadAvatar(url) {
-  const gltf = await new GLTFLoader().loadAsync(url);
-  const root = gltf.scene;
+  const isFbx = url.toLowerCase().split('?')[0].endsWith('.fbx');
+  const loaded = await (isFbx ? new FBXLoader() : new GLTFLoader()).loadAsync(url);
+  const root = normaliseScale(isFbx ? loaded : loaded.scene);
 
   /** name -> [{ mesh, index }] — a blendshape usually spans head *and* teeth. */
   const targets = new Map();
@@ -52,6 +104,7 @@ export async function loadAvatar(url) {
       node.receiveShadow = true;
 
       if (node.material) {
+        if (isFbx) upgradeMaterials(node);
         for (const mat of Array.isArray(node.material) ? node.material : [node.material]) {
           mat.envMapIntensity = 0.85;
         }
@@ -60,8 +113,12 @@ export async function loadAvatar(url) {
       const dict = node.morphTargetDictionary;
       if (!dict) return;
       for (const [name, index] of Object.entries(dict)) {
-        if (!targets.has(name)) targets.set(name, []);
-        targets.get(name).push({ mesh: node, index });
+        // Index on the bare name so lookups work whatever the exporter called
+        // it. Collisions are the point: `Head.jawOpen` and `Teeth.jawOpen`
+        // should move together.
+        const key = bareName(name);
+        if (!targets.has(key)) targets.set(key, []);
+        targets.get(key).push({ mesh: node, index });
       }
     }
   });

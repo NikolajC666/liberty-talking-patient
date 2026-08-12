@@ -196,7 +196,38 @@ patient means matching against a list of known voice names — brittle by
 construction, and worth knowing about if voice selection ever needs to be
 driven by scenario metadata.
 
-### 10. If better audio is needed, the ladder is short.
+### 10. Oculus visemes are the exception; ARKit is the industry default. **(Observed)**
+
+The pipeline was built against Ready Player Me's fifteen `viseme_*` blendshapes.
+A MetaPerson export from Avatar SDK turned out to carry **51 ARKit shapes and
+zero visemes** — and MetaPerson is far more representative. Character Creator,
+Daz and anything rigged for iPhone face capture all ship ARKit; Ready Player Me
+is the outlier for baking visemes in.
+
+The visemes can be synthesised. Each is a fixed pose over ARKit shapes —
+`viseme_PP` is `mouthClose` plus `mouthPress*`, `viseme_U` is `mouthPucker` plus
+`mouthFunnel` — scaled by whatever weight the lip-sync spring has arrived at, so
+the salience and undershoot work upstream survives untouched
+(`src/speech/arkitVisemes.js`).
+
+Two things this cost, both minor:
+
+- **No tongue.** MetaPerson omits ARKit's 52nd shape, `tongueOut`, so `TH` and
+  the alveolars are approximated with jaw and lip movement. At conversational
+  distance this is nearly free.
+- **Format.** MetaPerson exports FBX, not glTF. `FBXLoader` handles it including
+  embedded textures, at ~63 kB of bundle. Two gotchas: FBX has no reliable unit
+  convention (models arrive in centimetres and need rescaling to metres), and
+  the loader produces Phong materials that ignore PBR maps, so they need
+  promoting to `MeshStandardMaterial`.
+
+The useful conclusion: **an avatar only needs one of the two blendshape
+conventions**, and the speech code no longer constrains the choice of character
+vendor. Given §8 — that the reference patient is an elderly man none of the
+free presets resemble — keeping that door open matters more than it first
+appeared.
+
+### 11. If better audio is needed, the ladder is short.
 
 | Option | Keys | Local | Phoneme timings | Notes |
 | --- | --- | --- | --- | --- |

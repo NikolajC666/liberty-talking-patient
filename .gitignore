@@ -10,9 +10,12 @@ dist/
 # these two lines to switch from `npm run deploy` to automated deploys.
 .github/workflows/
 
-# Fetched with `npm run fetch-avatar`, not source. Ready Player Me avatars are
-# a few MB each and are trivially re-downloadable.
+# Avatar models. The presets are fetched with `npm run fetch-avatar` and are
+# trivially re-downloadable; hand-supplied models are several MB of binary that
+# would bloat history. Both are copied into the deployed build regardless.
 public/avatars/*.glb
+public/avatars/*.fbx
+avatar.zip
 
 .env
 .env.local

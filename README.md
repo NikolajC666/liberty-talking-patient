@@ -43,8 +43,16 @@ repository. All carry the fifteen Oculus visemes plus ARKit shapes on a
 mixamo-named rig, which is what this app expects. They are **sample assets —
 check licensing before shipping anything built on them.**
 
-To use your own, create one at [readyplayer.me](https://readyplayer.me) (no
-account needed for the demo creator) and pass its `.glb` URL. The script adds
+To use your own, drop it in as `public/avatars/patient.fbx` or
+`public/avatars/patient.glb` — the `.fbx` wins if both exist. Both formats
+load, units are normalised (FBX is usually authored in centimetres), and the
+model needs **either** the fifteen Oculus `viseme_*` shapes **or** the ARKit
+set, from which the visemes are synthesised (`src/speech/arkitVisemes.js`).
+That covers Ready Player Me, MetaPerson, Character Creator, Daz and anything
+rigged for iPhone face capture.
+
+Alternatively, create one at [readyplayer.me](https://readyplayer.me) and pass
+its `.glb` URL to `fetch-avatar`. The script adds
 `morphTargets=ARKit,Oculus Visemes` for you — **without those parameters the
 model has no visemes and the mouth cannot move** — then verifies the blendshapes
 actually arrived.
