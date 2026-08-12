@@ -8,7 +8,7 @@
  */
 
 import { getResponse } from './respond.js';
-import { SALIENCE } from './speech/visemes.js';
+import { SALIENCE, VISEMES } from './speech/visemes.js';
 import { voiceQuality } from './speech/tts.js';
 
 const $ = (id) => document.getElementById(id);
@@ -147,6 +147,18 @@ export function createUI({ speech, lipsync, idle, avatar }) {
 
   els.freezeIdle.addEventListener('change', () => {
     idle.frozen = els.freezeIdle.checked;
+  });
+
+  // Viseme hold — step through the mouth shapes one at a time.
+  const hold = $('hold');
+  for (const [label, value] of [['— off —', ''], ...VISEMES.map((v) => [v.replace('viseme_', ''), v])]) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    hold.append(option);
+  }
+  hold.addEventListener('change', () => {
+    lipsync.settings.hold = hold.value || null;
   });
 
   /* ---------- debug panel ---------- */

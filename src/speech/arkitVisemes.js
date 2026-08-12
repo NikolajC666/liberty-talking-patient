@@ -76,6 +76,9 @@ export const ARKIT_VISEMES = {
  * was the lower lip riding up over the upper one on word-final "th". Held long
  * enough in "breath" to be unmistakable.
  */
+/** Jaw opening at which `mouthClose` is worth applying at full authored weight. */
+const JAW_SEAL_REFERENCE = 0.25;
+
 export const CONFLICTING_SHAPES = [
   ['mouthShrugLower', 'mouthLowerDownLeft'],
   ['mouthShrugLower', 'mouthLowerDownRight'],
@@ -135,6 +138,19 @@ export function createVisemeAdapter(avatar) {
           out[shape] = Math.max(out[shape] ?? 0, Math.min(1, weight * scale));
         }
       }
+
+      // `mouthClose` seals the lips *against* an open jaw — on most rigs it is
+      // sculpted as the lower lip travelling up to meet the upper. Applied with
+      // the jaw already shut, the lower lip has nowhere to go but over the top
+      // one. Scale it by how open the jaw actually is this frame, which is also
+      // exactly when it earns its keep: catching the lips up with a jaw that is
+      // still springing closed out of a vowel.
+      if (out.mouthClose) {
+        const scaled = out.mouthClose * Math.min(1, (out.jawOpen ?? 0) / JAW_SEAL_REFERENCE);
+        if (scaled > 0.02) out.mouthClose = scaled;
+        else delete out.mouthClose;
+      }
+
       return out;
     },
   };

@@ -72,6 +72,12 @@ export function createLipsync() {
     intensity: 1.0,
     jawCoupling: 0.25,
     offsetMs: 0,
+    /**
+     * Pin a single viseme on, ignoring the schedule. Purely diagnostic: it is
+     * the only way to look at one mouth shape long enough to judge it, rather
+     * than trying to catch it in a 60 ms window mid-sentence.
+     */
+    hold: null,
   };
 
   /** Lay out words [from..] end to end, starting from that word's own start. */
@@ -178,7 +184,9 @@ export function createLipsync() {
       lastFrameAt = now;
 
       const { responseMs, intensity, jawCoupling } = settings;
-      const viseme = visemeAt(now + settings.offsetMs);
+      const viseme = settings.hold
+        ? { name: settings.hold, weight: 1, units: 1 }
+        : visemeAt(now + settings.offsetMs);
       activeName = viseme?.name ?? null;
 
       // Targets: the current viseme at its visual-salience weight, and a jaw

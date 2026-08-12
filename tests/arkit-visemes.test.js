@@ -77,9 +77,11 @@ test('salience is not applied twice', () => {
     const out = adapter.translate({ [viseme]: SALIENCE[viseme] });
 
     for (const [shape, weight] of Object.entries(authored)) {
+      // mouthClose is deliberately jaw-dependent; covered by its own tests.
+      if (shape === 'mouthClose') continue;
       assert.ok(
         Math.abs(out[shape] - weight) < 1e-9,
-        `${viseme}.${shape}: got ${out[shape].toFixed(3)}, authored ${weight}`,
+        `${viseme}.${shape}: got ${out[shape]?.toFixed(3)}, authored ${weight}`,
       );
     }
   }
@@ -121,12 +123,36 @@ test('no single shape is driven to an extreme', () => {
   }
 });
 
-test('bilabials close the mouth rather than opening it', () => {
+test('bilabials press the lips without dropping the jaw', () => {
   const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
   const out = adapter.translate({ viseme_PP: 1 });
-  assert.ok(out.mouthClose >= 0.35, `mouthClose only ${out.mouthClose}`);
-  assert.ok(out.mouthPressLeft > 0, 'the lips should press, not just close');
+  assert.ok(out.mouthPressLeft > 0, 'the lips should press together');
   assert.ok(!out.jawOpen, 'a closed lip shape must not also drop the jaw');
+});
+
+test('mouthClose stays out of the way when the jaw is already shut', () => {
+  // Regression. mouthClose is sculpted as the lower lip travelling up to seal
+  // against an open jaw. Fired with the mouth already closed, the lower lip
+  // rides over the upper one.
+  const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
+  const shut = adapter.translate({ viseme_PP: 1 });
+  assert.ok(!shut.mouthClose, `mouthClose was ${shut.mouthClose} with the jaw closed`);
+});
+
+test('mouthClose does engage while the jaw is still open', () => {
+  // The other half: coming out of an open vowel the jaw lags, and this is what
+  // gets the lips shut in time for the bilabial.
+  const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
+  const mid = adapter.translate({ viseme_PP: 1, jawOpen: 0.4 });
+  assert.ok(mid.mouthClose > 0.2, `mouthClose only reached ${mid.mouthClose}`);
+  assert.ok(mid.mouthClose <= ARKIT_VISEMES.viseme_PP.mouthClose, 'must not exceed the authored weight');
+});
+
+test('mouthClose scales with how open the jaw is', () => {
+  const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
+  const little = adapter.translate({ viseme_PP: 1, jawOpen: 0.1 });
+  const lots = adapter.translate({ viseme_PP: 1, jawOpen: 0.3 });
+  assert.ok(lots.mouthClose > little.mouthClose);
 });
 
 test('rounded vowels pucker and funnel', () => {
