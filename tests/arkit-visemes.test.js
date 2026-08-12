@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ARKIT_VISEMES, createVisemeAdapter } from '../src/speech/arkitVisemes.js';
-import { VISEMES } from '../src/speech/visemes.js';
+import { VISEMES, SALIENCE } from '../src/speech/visemes.js';
 
 /** The 51 shapes the MetaPerson export actually carries — ARKit minus tongueOut. */
 const METAPERSON = [
@@ -55,6 +55,39 @@ test('every viseme maps onto shapes the MetaPerson rig actually has', () => {
     if (viseme === 'viseme_sil') continue;
     const out = adapter.translate({ [viseme]: 1 });
     assert.ok(Object.keys(out).length > 0, `${viseme} maps to nothing`);
+  }
+});
+
+test('salience is not applied twice', () => {
+  // Regression. The pose table already encodes how visible each sound is, and
+  // visemes.js has scaled by salience before we see it. Applying both flattened
+  // every consonant to under 0.1 — a face that flapped on vowels and
+  // articulated nothing in between.
+  const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
+
+  for (const viseme of VISEMES) {
+    const authored = ARKIT_VISEMES[viseme];
+    if (!Object.keys(authored ?? {}).length) continue;
+
+    // What lipsync emits when the spring is fully arrived: the salience value.
+    const out = adapter.translate({ [viseme]: SALIENCE[viseme] });
+
+    for (const [shape, weight] of Object.entries(authored)) {
+      assert.ok(
+        Math.abs(out[shape] - weight) < 1e-9,
+        `${viseme}.${shape}: got ${out[shape].toFixed(3)}, authored ${weight}`,
+      );
+    }
+  }
+});
+
+test('quiet consonants still register visibly', () => {
+  // The specific symptom of the double-attenuation bug.
+  const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
+  for (const viseme of ['viseme_kk', 'viseme_DD', 'viseme_nn', 'viseme_SS']) {
+    const out = adapter.translate({ [viseme]: SALIENCE[viseme] });
+    const peak = Math.max(...Object.values(out));
+    assert.ok(peak > 0.2, `${viseme} peaks at only ${peak.toFixed(3)}`);
   }
 });
 
