@@ -34,36 +34,59 @@ export const ARKIT_VISEMES = {
   // rolls the lips inward, and pushed hard with the jaw already shut it reads
   // as sucking the lips in rather than pressing them together. Its real job is
   // getting the mouth shut quickly on the way out of an open vowel.
-  viseme_PP: { mouthClose: 0.55, mouthPressLeft: 0.5, mouthPressRight: 0.5 },
+  viseme_PP: { mouthClose: 0.45, mouthPressLeft: 0.4, mouthPressRight: 0.4 },
 
   // Labiodental: lower lip tucks under the upper teeth.
-  viseme_FF: { mouthRollLower: 0.6, mouthUpperUpLeft: 0.24, mouthUpperUpRight: 0.24, jawOpen: 0.08 },
+  viseme_FF: { mouthRollLower: 0.5, mouthUpperUpLeft: 0.2, mouthUpperUpRight: 0.2, jawOpen: 0.08 },
 
-  // Dental — would be tongue-between-teeth if we had a tongue.
-  viseme_TH: { jawOpen: 0.24, mouthLowerDownLeft: 0.3, mouthLowerDownRight: 0.3, mouthShrugLower: 0.2 },
+  // Dental. With no tongue to put between the teeth, the honest move is to
+  // suggest the gap and stop there — a slight jaw opening and the lower lip
+  // easing down. Overshaping this one is worse than undershaping it.
+  viseme_TH: { jawOpen: 0.2, mouthLowerDownLeft: 0.16, mouthLowerDownRight: 0.16 },
 
-  // Alveolar stops.
-  viseme_DD: { jawOpen: 0.18, mouthShrugUpper: 0.28, mouthPressLeft: 0.12, mouthPressRight: 0.12 },
+  // Alveolar stops. Tongue-tip sounds, so almost nothing shows but the jaw.
+  viseme_DD: { jawOpen: 0.18, mouthLowerDownLeft: 0.1, mouthLowerDownRight: 0.1 },
 
   // Velar: made at the back of the tongue, so barely anything shows.
-  viseme_kk: { jawOpen: 0.26 },
+  viseme_kk: { jawOpen: 0.24 },
 
   // Postalveolar: rounded and protruded.
-  viseme_CH: { mouthPucker: 0.45, mouthFunnel: 0.35, jawOpen: 0.16, mouthShrugUpper: 0.14 },
+  viseme_CH: { mouthPucker: 0.4, mouthFunnel: 0.3, jawOpen: 0.14 },
 
   // Sibilants: narrow aperture, teeth nearly together.
-  viseme_SS: { mouthStretchLeft: 0.34, mouthStretchRight: 0.34, mouthSmileLeft: 0.16, mouthSmileRight: 0.16, jawOpen: 0.06 },
+  viseme_SS: { mouthStretchLeft: 0.28, mouthStretchRight: 0.28, mouthSmileLeft: 0.14, mouthSmileRight: 0.14, jawOpen: 0.06 },
 
-  viseme_nn: { jawOpen: 0.18, mouthShrugUpper: 0.24 },
-  viseme_RR: { mouthPucker: 0.38, mouthFunnel: 0.18, jawOpen: 0.22 },
+  viseme_nn: { jawOpen: 0.16, mouthLowerDownLeft: 0.08, mouthLowerDownRight: 0.08 },
+  viseme_RR: { mouthPucker: 0.32, mouthFunnel: 0.16, jawOpen: 0.2 },
 
   // Vowels, by aperture and rounding.
-  viseme_aa: { jawOpen: 0.7, mouthStretchLeft: 0.1, mouthStretchRight: 0.1 },
-  viseme_E: { jawOpen: 0.3, mouthSmileLeft: 0.26, mouthSmileRight: 0.26, mouthStretchLeft: 0.2, mouthStretchRight: 0.2 },
-  viseme_I: { jawOpen: 0.16, mouthSmileLeft: 0.38, mouthSmileRight: 0.38, mouthStretchLeft: 0.14, mouthStretchRight: 0.14 },
-  viseme_O: { jawOpen: 0.4, mouthFunnel: 0.58, mouthPucker: 0.3 },
-  viseme_U: { jawOpen: 0.12, mouthPucker: 0.68, mouthFunnel: 0.4 },
+  viseme_aa: { jawOpen: 0.55, mouthStretchLeft: 0.08, mouthStretchRight: 0.08 },
+  viseme_E: { jawOpen: 0.26, mouthSmileLeft: 0.22, mouthSmileRight: 0.22, mouthStretchLeft: 0.16, mouthStretchRight: 0.16 },
+  viseme_I: { jawOpen: 0.14, mouthSmileLeft: 0.3, mouthSmileRight: 0.3, mouthStretchLeft: 0.12, mouthStretchRight: 0.12 },
+  viseme_O: { jawOpen: 0.34, mouthFunnel: 0.48, mouthPucker: 0.26 },
+  viseme_U: { jawOpen: 0.1, mouthPucker: 0.55, mouthFunnel: 0.34 },
 };
+
+/**
+ * Shapes that move a lip *against* the direction the rest of a pose is moving
+ * it, and so must never appear alongside their opposites.
+ *
+ * `mouthShrugLower` pushes the lower lip up and out — the doubtful-pout shape.
+ * Combined with `mouthLowerDown*`, which pulls the same lip down, the result
+ * was the lower lip riding up over the upper one on word-final "th". Held long
+ * enough in "breath" to be unmistakable.
+ */
+export const CONFLICTING_SHAPES = [
+  ['mouthShrugLower', 'mouthLowerDownLeft'],
+  ['mouthShrugLower', 'mouthLowerDownRight'],
+  ['mouthShrugUpper', 'mouthUpperUpLeft'],
+  ['mouthShrugUpper', 'mouthUpperUpRight'],
+  // Rounding versus spreading — a mouth cannot do both.
+  ['mouthPucker', 'mouthSmileLeft'],
+  ['mouthPucker', 'mouthSmileRight'],
+  ['mouthPucker', 'mouthStretchLeft'],
+  ['mouthPucker', 'mouthStretchRight'],
+];
 
 /**
  * Build a pose translator for a given avatar.

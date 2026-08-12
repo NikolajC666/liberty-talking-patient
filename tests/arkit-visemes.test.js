@@ -7,7 +7,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ARKIT_VISEMES, createVisemeAdapter } from '../src/speech/arkitVisemes.js';
+import {
+  ARKIT_VISEMES,
+  CONFLICTING_SHAPES,
+  createVisemeAdapter,
+} from '../src/speech/arkitVisemes.js';
 import { VISEMES, SALIENCE } from '../src/speech/visemes.js';
 
 /** The 51 shapes the MetaPerson export actually carries — ARKit minus tongueOut. */
@@ -82,19 +86,46 @@ test('salience is not applied twice', () => {
 });
 
 test('quiet consonants still register visibly', () => {
-  // The specific symptom of the double-attenuation bug.
+  // The specific symptom of the double-attenuation bug, which pushed these to
+  // 0.06-0.08. The floor is set well below the authored values so that tuning
+  // amplitude down stays possible; it is only here to catch collapse.
   const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
   for (const viseme of ['viseme_kk', 'viseme_DD', 'viseme_nn', 'viseme_SS']) {
     const out = adapter.translate({ [viseme]: SALIENCE[viseme] });
     const peak = Math.max(...Object.values(out));
-    assert.ok(peak > 0.2, `${viseme} peaks at only ${peak.toFixed(3)}`);
+    assert.ok(peak > 0.12, `${viseme} peaks at only ${peak.toFixed(3)}`);
+  }
+});
+
+test('no pose pulls the same lip in two directions', () => {
+  // Regression. viseme_TH fired mouthShrugLower (lower lip up and out) at the
+  // same time as mouthLowerDown* (lower lip down). On word-final "th" — as in
+  // "breath" — the lower lip rode up over the upper one.
+  for (const [viseme, pose] of Object.entries(ARKIT_VISEMES)) {
+    for (const [a, b] of CONFLICTING_SHAPES) {
+      assert.ok(
+        !(pose[a] && pose[b]),
+        `${viseme} drives both ${a} and ${b}, which fight each other`,
+      );
+    }
+  }
+});
+
+test('no single shape is driven to an extreme', () => {
+  // Blendshapes are sculpted for their maximum to be an exaggeration. Anything
+  // near 1.0 in normal speech is going to look like mugging.
+  for (const [viseme, pose] of Object.entries(ARKIT_VISEMES)) {
+    for (const [shape, weight] of Object.entries(pose)) {
+      assert.ok(weight <= 0.6, `${viseme}.${shape} is ${weight}, too strong for speech`);
+    }
   }
 });
 
 test('bilabials close the mouth rather than opening it', () => {
   const adapter = createVisemeAdapter(fakeAvatar(METAPERSON));
   const out = adapter.translate({ viseme_PP: 1 });
-  assert.ok(out.mouthClose > 0.5);
+  assert.ok(out.mouthClose >= 0.35, `mouthClose only ${out.mouthClose}`);
+  assert.ok(out.mouthPressLeft > 0, 'the lips should press, not just close');
   assert.ok(!out.jawOpen, 'a closed lip shape must not also drop the jaw');
 });
 
