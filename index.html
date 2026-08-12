@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Talking patient — lip-sync spike</title>
-    <script type="module" crossorigin src="./assets/index-B9Gi1zF7.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BrVBFkTs.css">
+    <script type="module" crossorigin src="./assets/index-DVTKgld-.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BD-2-tPJ.css">
   </head>
   <body>
     <div id="app">
@@ -75,6 +75,14 @@
             <span>Lead / lag <output id="offset-out">0</output> ms</span>
             <input id="offset" type="range" min="-300" max="300" step="10" value="0" />
           </label>
+          <label class="slider">
+            <span>Hold viseme</span>
+            <select id="hold" aria-label="Pin one viseme on for inspection"></select>
+          </label>
+          <p class="note">
+            Pins a single mouth shape on so you can look at it properly instead
+            of catching it mid-sentence.
+          </p>
         </section>
 
         <section>
